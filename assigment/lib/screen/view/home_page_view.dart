@@ -1,8 +1,11 @@
-import 'package:assigment/core/constants/color/color_constants.dart';
+import 'package:assigment/components/app_bar_card.dart';
+import 'package:assigment/components/list_card.dart';
+import 'package:assigment/components/search_card.dart';
 import 'package:assigment/screen/model/comments_model.dart';
 import 'package:assigment/screen/service/comments_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 
 import '../../core/base/state/base_state.dart';
 import '../../core/base/view/base_view.dart';
@@ -17,7 +20,17 @@ class HomePageView extends StatefulWidget {
 
 class _HomePageViewState extends BaseState<HomePageView> {
   HomePageViewModel? viewmodel;
-  List<CommentsModel> comments = [];
+
+  @override
+  void initState() {
+    CommentsService().getComments().then((value) {
+      setState(() {
+        viewmodel!.comments = value;
+      });
+    });
+
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,282 +46,83 @@ class _HomePageViewState extends BaseState<HomePageView> {
             child: SingleChildScrollView(
               child: Column(
                 children: <Widget>[
-                  Container(
-                    width: dynamicWidth(375),
-                    height: dynamicHeight(150),
-                    decoration: BoxDecoration(
-                      color: ColorConstants.instance.white,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.withOpacity(0.5),
-                          spreadRadius: 5,
-                          blurRadius: 7,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(15),
-                        bottomRight: Radius.circular(15),
+                  AppBarcard(onTap: () {
+                    setState(() {
+                      viewmodel.isEditFunc();
+                    });
+                  }),
+                  Column(
+                    children: <Widget>[
+                      SearchCard(
+                        controller: viewmodel.searchController,
+                        onSubmitted: (String text) {
+                          setState(() {
+                            viewmodel.searching();
+                          });
+                        },
                       ),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: dynamicWidth(10)),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: <Widget>[
-                          const Text(
-                            'Comments',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 30),
-                          ),
-                          GestureDetector(
-                            child: SizedBox(
-                              width: dynamicWidth(50),
-                              height: dynamicHeight(30),
-                              child: Text(
-                                'Duzenle',
-                                style: TextStyle(color: ColorConstants.instance.primary),
-                              ),
-                            ),
-                            onTap: () => viewmodel.isEditFunc(),
-                          )
-                        ],
-                      ),
-                    ),
-                  ),
-                  buildComments(),
+                      viewmodel.comments.isEmpty
+                          ? const CupertinoActivityIndicator()
+                          : viewmodel.searchController.text == ''
+                              ? SizedBox(
+                                  height: dynamicHeight(812),
+                                  width: dynamicWidth(375),
+                                  child: Observer(builder: (_) {
+                                    return RefreshIndicator(
+                                      onRefresh: () async {
+                                        List<CommentsModel> newComments = await CommentsService().getComments();
+                                        viewmodel.comments = newComments;
+                                      },
+                                      child: ListView.builder(
+                                        shrinkWrap: true,
+                                        itemCount: viewmodel.comments.length,
+                                        itemBuilder: (BuildContext ctxt, int index) {
+                                          return ListCard(
+                                            body: viewmodel.comments[index].body!,
+                                            name: viewmodel.comments[index].name!,
+                                            isEdit: viewmodel.isEdit,
+                                            cardDeleting: () {
+                                              setState(() {
+                                                viewmodel.delete(viewmodel.comments[index]);
+                                              });
+                                            },
+                                            email: viewmodel.comments[index].email!,
+                                          );
+                                        },
+                                      ),
+                                    );
+                                  }),
+                                )
+                              : SizedBox(
+                                  height: dynamicHeight(812),
+                                  width: dynamicWidth(375),
+                                  child: Observer(builder: (_) {
+                                    return ListView.builder(
+                                      shrinkWrap: true,
+                                      itemCount: viewmodel.searchComments.length,
+                                      itemBuilder: (BuildContext ctxt, int index) {
+                                        return ListCard(
+                                          body: viewmodel.searchComments[index].body!,
+                                          name: viewmodel.searchComments[index].name!,
+                                          isEdit: viewmodel.isEdit,
+                                          cardDeleting: () {
+                                            setState(() {
+                                              viewmodel.deleteOnSearch(viewmodel.searchComments[index]);
+                                            });
+                                          },
+                                          email: viewmodel.searchComments[index].email!,
+                                        );
+                                      },
+                                    );
+                                  }),
+                                )
+                    ],
+                  )
                 ],
               ),
             ),
           ),
         );
-      },
-    );
-  }
-
-  FutureBuilder<List<CommentsModel>> buildComments() {
-    return FutureBuilder<List<CommentsModel>>(
-      future: CommentsService().getComments(),
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          comments = snapshot.data!;
-
-          return Column(
-            children: <Widget>[
-              Padding(
-                padding: EdgeInsets.symmetric(vertical: dynamicHeight(15)),
-                child: SizedBox(
-                  width: dynamicWidth(350),
-                  height: dynamicHeight(50),
-                  child: CupertinoSearchTextField(
-                    controller: viewmodel!.searchController,
-                    onSubmitted: (String text) {
-                      viewmodel!.searchComments.clear();
-                      comments.forEach((comment) {
-                        if (comment.name == viewmodel!.searchController.text) {
-                          viewmodel!.searchComments.add(comment);
-                        }
-                      });
-                    },
-                  ),
-                ),
-              ),
-              viewmodel!.searchController.text == ''
-                  ? SizedBox(
-                      height: dynamicHeight(812),
-                      width: dynamicWidth(375),
-                      child: RefreshIndicator(
-                        onRefresh: () async {
-                          List<CommentsModel> newComments = await CommentsService().getComments();
-                          setState(() {
-                            comments = newComments;
-                          });
-                        },
-                        child: ListView.builder(
-                          shrinkWrap: true,
-                          itemCount: comments.length,
-                          itemBuilder: (BuildContext ctxt, int index) {
-                            return Padding(
-                              padding: EdgeInsets.symmetric(vertical: dynamicHeight(10), horizontal: dynamicWidth(10)),
-                              child: Container(
-                                width: dynamicWidth(350),
-                                height: dynamicHeight(200),
-                                alignment: Alignment.centerLeft,
-                                decoration: BoxDecoration(
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.grey.withOpacity(0.5),
-                                      spreadRadius: 5,
-                                      blurRadius: 7,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ],
-                                  color: ColorConstants.instance.white,
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(15.0),
-                                  child: Column(
-                                    children: <Widget>[
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: <Widget>[
-                                          SizedBox(
-                                            width: dynamicWidth(275),
-                                            child: Text(
-                                              comments[index].name!,
-                                              overflow: TextOverflow.ellipsis,
-                                              maxLines: 1,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 20,
-                                              ),
-                                            ),
-                                          ),
-                                          Visibility(
-                                            visible: viewmodel!.isEdit ? true : false,
-                                            child: GestureDetector(
-                                              onTap: () {
-                                                comments.remove(comments[index]);
-                                              },
-                                              child: Icon(
-                                                Icons.cancel,
-                                                color: ColorConstants.instance.primary,
-                                              ),
-                                            ),
-                                          )
-                                        ],
-                                      ),
-                                      Padding(
-                                        padding: EdgeInsets.only(top: dynamicHeight(5), bottom: dynamicHeight(17)),
-                                        child: SizedBox(
-                                          width: dynamicWidth(350),
-                                          child: Text(
-                                            comments[index].email!,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w300,
-                                              color: ColorConstants.instance.secondary,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      SizedBox(
-                                        width: dynamicWidth(350),
-                                        child: Text(
-                                          comments[index].body!,
-                                          maxLines: 6,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 15),
-                                        ),
-                                      )
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    )
-                  : SizedBox(
-                      height: dynamicHeight(812),
-                      width: dynamicWidth(375),
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: viewmodel!.searchComments.length,
-                        itemBuilder: (BuildContext ctxt, int index) {
-                          return Padding(
-                            padding: EdgeInsets.symmetric(vertical: dynamicHeight(10), horizontal: dynamicWidth(10)),
-                            child: Container(
-                              width: dynamicWidth(350),
-                              height: dynamicHeight(200),
-                              alignment: Alignment.centerLeft,
-                              decoration: BoxDecoration(
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.grey.withOpacity(0.5),
-                                    spreadRadius: 5,
-                                    blurRadius: 7,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                                color: ColorConstants.instance.white,
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(15.0),
-                                child: Column(
-                                  children: <Widget>[
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: <Widget>[
-                                        SizedBox(
-                                          width: dynamicWidth(275),
-                                          child: Text(
-                                            viewmodel!.searchComments[index].name,
-                                            overflow: TextOverflow.ellipsis,
-                                            maxLines: 1,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 20,
-                                            ),
-                                          ),
-                                        ),
-                                        Visibility(
-                                          visible: viewmodel!.isEdit ? true : false,
-                                          child: GestureDetector(
-                                            onTap: () {
-                                              comments.remove(comments[index]);
-                                              viewmodel!.searchComments.remove(viewmodel!.searchComments[index]);
-                                            },
-                                            child: Icon(
-                                              Icons.cancel,
-                                              color: ColorConstants.instance.primary,
-                                            ),
-                                          ),
-                                        )
-                                      ],
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.only(top: dynamicHeight(5), bottom: dynamicHeight(17)),
-                                      child: SizedBox(
-                                        width: dynamicWidth(350),
-                                        child: Text(
-                                          viewmodel!.searchComments[index].email,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.w300,
-                                            color: ColorConstants.instance.secondary,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(
-                                      width: dynamicWidth(350),
-                                      child: Text(
-                                        viewmodel!.searchComments[index].body,
-                                        maxLines: 6,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontWeight: FontWeight.normal, fontSize: 15),
-                                      ),
-                                    )
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-            ],
-          );
-        } else if (snapshot.hasError) {
-          return Text(
-            '${snapshot.error}',
-            style: TextStyle(color: ColorConstants.instance.error, fontWeight: FontWeight.bold),
-          );
-        }
-        return const Center(child: CupertinoActivityIndicator());
       },
     );
   }
