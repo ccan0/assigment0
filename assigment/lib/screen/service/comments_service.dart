@@ -1,6 +1,4 @@
-import 'package:assigment/core/constants/API/api_constans.dart';
 import 'package:assigment/screen/model/comments_model.dart';
-import 'package:dio/dio.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
@@ -13,8 +11,8 @@ class CommentsService {
 
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
-      for (var jsons2 in jsonResponse) {
-        comments.add(CommentsModel.fromJson(jsons2));
+      for (var jsonResponseData in jsonResponse) {
+        comments.add(CommentsModel.fromJson(jsonResponseData));
       }
       return comments;
     } else {
