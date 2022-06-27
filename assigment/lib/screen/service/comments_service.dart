@@ -16,7 +16,7 @@ class CommentsService {
       }
       return comments;
     } else {
-      throw Exception("Ürün yükleme işlemi başarısız oldu. Lütfen tekrar deneyiniz.");
+      throw Exception("Fetch Failed.");
     }
   }
 }
